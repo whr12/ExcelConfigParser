@@ -1,0 +1,13 @@
+{
+    "namespace" : "GameConfig",
+    "excel_path" : "",
+    "output_path" : "",
+
+    "invalid_excel_prefix" : "__",
+    "enum_prefix" : "E_",
+    "global_prefix" : "G_",
+
+    "data_name_row" : 2,
+    "data_type_row" : 3,
+    "data_start_row" : 4
+}

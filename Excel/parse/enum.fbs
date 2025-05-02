@@ -1,0 +1,10 @@
+
+namespace GameConfig;
+
+enum CustomType : int
+{
+	None = 0,
+	A = 1,
+	B,
+	C
+}

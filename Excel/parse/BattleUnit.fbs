@@ -1,0 +1,13 @@
+// Parse from BattleUnit.xlsx, Sheet1
+include "enum.fbs";
+
+namespace GameConfig;
+
+table BattleUnit
+{
+id:uint;
+name:string;
+description:string;
+description2:CustomType;
+}
+
