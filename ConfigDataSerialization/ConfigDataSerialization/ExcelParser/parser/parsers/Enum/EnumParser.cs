@@ -1,21 +1,23 @@
 using System.Collections.Generic;
 
-namespace ConfigDataSerialization.ExcelParser.parser
+namespace ConfigDataSerialization.ExcelParser.parser.parsers
 {
     /// <summary>
-    /// 类型3 — 枚举定义解析器。按行读取枚举值定义。
-    /// 实现 IExcelParser&lt;EnumSheetInfo&gt;，无状态。
+    /// 类型3 — 枚举定义解析器门面。
+    /// 只需生成 .fbs，JSON 和 Wrapper 为空实现。
     /// </summary>
-    public class EnumParser : IExcelParser<EnumSheetInfo>
+    public class EnumParser : IExcelParser
     {
         private readonly ParseConfig _config;
+        private readonly EnumFbsGenerator _fbsGen;
 
         public EnumParser(ParseConfig config)
         {
             _config = config;
+            _fbsGen = new EnumFbsGenerator();
         }
 
-        public EnumSheetInfo AnalyseSheet(IExcelSheetReader reader)
+        public SheetDataInfo AnalyseSheet(IExcelSheetReader reader)
         {
             var sheetName = reader.GetSheetName();
             var baseName = sheetName.Substring(_config.EnumPrefix.Length);
@@ -24,13 +26,12 @@ namespace ConfigDataSerialization.ExcelParser.parser
             {
                 ExcelFileName = reader.GetExcelName(),
                 SheetName = sheetName,
-                DefineName = DefaultExcelParser.ConvertSheetNameToDefineName(baseName),
-                BinaryFileName = null,  // 枚举不需要 .bin
+                DefineName = baseName,
+                BinaryFileName = string.Empty,
                 Namespace = _config.Namespace,
                 Values = new List<EnumValueDefinition>(),
             };
 
-            // 从 DataStartRow 开始遍历：Col1=数值, Col2=枚举名, Col3=备注
             int rowCount = reader.GetSheetRowCount();
             for (int row = _config.DataStartRow; row <= rowCount; row++)
             {
@@ -52,6 +53,21 @@ namespace ConfigDataSerialization.ExcelParser.parser
             }
 
             return info;
+        }
+
+        public void GenerateFbs(SheetDataInfo info, string outputPath)
+        {
+            _fbsGen.Generate((EnumSheetInfo)info, outputPath);
+        }
+
+        public void SerializeJson(SheetDataInfo info, IExcelSheetReader reader, string outputPath)
+        {
+            // 枚举不需要 json
+        }
+
+        public void CreateWrapper(SheetDataInfo info, string outputPath)
+        {
+            // 枚举不需要 wrapper，flatc 直接生成 C# enum
         }
     }
 }

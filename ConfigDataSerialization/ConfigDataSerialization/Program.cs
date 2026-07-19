@@ -1,28 +1,54 @@
 using ConfigDataSerialization.ExcelParser;
+using ConfigDataSerialization.ExcelParser.parser;
+using System;
 using System.IO;
 using System.Text.Json;
 
 internal class Program
 {
+    private enum ExportMode { All, CodeOnly, DataOnly }
+
     private static void Main(string[] args)
     {
         Console.WriteLine("ExcelConfigParser — Excel → FlatBuffer 导出工具");
 
-        // 配置文件路径：命令行参数 > 默认相对路径
-        string configPath;
-        if (args.Length > 0)
+        // 解析参数
+        var mode = ExportMode.All;
+        string configPath = null;
+
+        foreach (var arg in args)
         {
-            configPath = args[0];
+            switch (arg)
+            {
+                case "-c":
+                case "--code":
+                    mode = ExportMode.CodeOnly;
+                    break;
+                case "-d":
+                case "--data":
+                    mode = ExportMode.DataOnly;
+                    break;
+                case "-a":
+                case "--all":
+                    mode = ExportMode.All;
+                    break;
+                default:
+                    if (!arg.StartsWith("-"))
+                        configPath = arg;
+                    break;
+            }
         }
-        else
+
+        if (configPath == null)
         {
-            configPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "../../../../Excel/json/parse_config.json");
+            Console.WriteLine("[Error] 必须指定配置文件路径");
+            Console.WriteLine("用法: ConfigDataSerialization.exe <config.json> [--code|--data|--all]");
+            return;
         }
 
         configPath = Path.GetFullPath(configPath);
         Console.WriteLine($"[Config] {configPath}");
+        Console.WriteLine($"[Mode] {(mode == ExportMode.All ? "全部" : mode == ExportMode.CodeOnly ? "仅代码" : "仅数据")}");
 
         if (!File.Exists(configPath))
         {
@@ -35,11 +61,17 @@ internal class Program
 
         var parser = ExcelParser.Create(config);
 
-        Console.WriteLine("[Step 1/2] 生成代码...");
-        parser.ParseCode();
+        if (mode != ExportMode.DataOnly)
+        {
+            Console.WriteLine("[1/2] 生成代码...");
+            parser.ParseCode();
+        }
 
-        Console.WriteLine("[Step 2/2] 导出数据...");
-        parser.ParseData();
+        if (mode != ExportMode.CodeOnly)
+        {
+            Console.WriteLine(mode == ExportMode.All ? "[2/2] 导出数据..." : "[1/1] 导出数据...");
+            parser.ParseData();
+        }
 
         Console.WriteLine("完成。");
     }

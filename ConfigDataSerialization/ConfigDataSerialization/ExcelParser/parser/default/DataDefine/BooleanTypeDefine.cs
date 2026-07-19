@@ -22,16 +22,21 @@ namespace ConfigDataSerialization.ExcelParser
                 return true;
             }
 
-            if (bool.TryParse(rawText, out var value))
+            // 数值：0 → false，非0 → true
+            if (int.TryParse(rawText, out var intValue))
             {
-                result = value.ToString();
+                result = intValue != 0 ? "true" : "false";
                 return true;
             }
-            else
+
+            if (bool.TryParse(rawText, out var value))
             {
-                Log.Error($"Input Text({rawText}) can't convert to {Name}, return {result} instead.");
-                return false;
+                result = value.ToString().ToLowerInvariant();
+                return true;
             }
+
+            Log.Error($"Input Text({rawText}) can't convert to {Name}, return {result} instead.");
+            return false;
         }
     }
 }

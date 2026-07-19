@@ -4,6 +4,7 @@ using Google.FlatBuffers;
 
 namespace GameConfig
 {
+#FIELD_COMMENTS#
     public class #DEFINE_NAME#Data : ITableData
     {
         private const string FILE_NAME = "#BINARY_FILE#";

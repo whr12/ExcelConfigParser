@@ -13,6 +13,7 @@ namespace ConfigDataSerialization.ExcelParser
         public int columnIndex;
         public string typeName => dataType.Name;
         public int typeLength => dataType.TypeLength;
+        public string Comment;
     }
 
     public interface ITypeDefine

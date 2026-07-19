@@ -63,6 +63,11 @@ namespace ConfigDataSerialization.ExcelParser.parser
             Console.WriteLine($"[flatc] {Path.GetFileName(_flatcPath)} {arguments}");
 
             var process = Process.Start(psi);
+            if (process == null)
+            {
+                Console.Error.WriteLine($"[flatc] 启动失败: {_flatcPath}");
+                return;
+            }
             process.WaitForExit();
 
             string stdout = process.StandardOutput.ReadToEnd();

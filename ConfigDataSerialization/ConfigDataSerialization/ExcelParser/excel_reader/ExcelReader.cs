@@ -1,42 +1,43 @@
-﻿using OfficeOpenXml;
+using System.IO;
+using OfficeOpenXml;
 
 namespace ConfigDataSerialization.ExcelParser
 {
     public class ExcelReader : IExcelReader, IExcelSheetReader, IDisposable
     {
-        private ExcelPackage package;
-
-        private ExcelWorksheet workSheet;
+        private readonly string _filePath;
+        private FileStream _fileStream;
+        private ExcelPackage _package;
+        private ExcelWorksheet _workSheet;
 
         public static ExcelReader CreateExcelReader(string filePath)
         {
-            ExcelReader reader = new ExcelReader(filePath);            
-
-            return reader;
+            return new ExcelReader(filePath);
         }
 
         private ExcelReader(string filePath)
         {
-            package = new ExcelPackage(filePath);
-
-            workSheet = package.Workbook.Worksheets[0];
+            _filePath = filePath;
+            _fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            _package = new ExcelPackage(_fileStream);
+            _workSheet = _package.Workbook.Worksheets[0];
         }
 
         public string GetExcelName()
         {
-            return package.File.Name;
+            return Path.GetFileName(_filePath);
         }
 
         public int GetWorkSheetsCount()
         {
-            return workSheet.Workbook.Worksheets.Count;
+            return _workSheet.Workbook.Worksheets.Count;
         }
 
         public bool TrySwitchSheet(int sheetIndex)
         {
-            if (sheetIndex >= 0 && package.Workbook.Worksheets.Count > sheetIndex)
+            if (sheetIndex >= 0 && _package.Workbook.Worksheets.Count > sheetIndex)
             {
-                workSheet = package.Workbook.Worksheets[sheetIndex];
+                _workSheet = _package.Workbook.Worksheets[sheetIndex];
                 return true;
             }
             return false;
@@ -44,44 +45,42 @@ namespace ConfigDataSerialization.ExcelParser
 
         public bool TrySwitchSheet(string sheetName)
         {
-            if (package.Workbook.Worksheets[sheetName] == null)
-            {
+            if (_package.Workbook.Worksheets[sheetName] == null)
                 return false;
-            }
 
-            workSheet = package.Workbook.Worksheets[sheetName];
+            _workSheet = _package.Workbook.Worksheets[sheetName];
             return true;
         }
 
         public string GetSheetName()
         {
-            return workSheet.Name;
+            return _workSheet.Name;
         }
 
         public int GetSheetIndex()
         {
-            return workSheet.Index;
+            return _workSheet.Index;
         }
-
 
         public string ReadSheet(int row, int column)
         {
-            return workSheet.Cells[row, column].Text;
+            return _workSheet.Cells[row, column].Text;
         }
 
         public int GetSheetColumnCount()
         {
-             return workSheet.Dimension.Columns;
+            return _workSheet.Dimension.Columns;
         }
 
         public int GetSheetRowCount()
         {
-            return workSheet.Dimension.Rows;
+            return _workSheet.Dimension.Rows;
         }
 
         public void Dispose()
         {
-            package.Dispose();
+            _package.Dispose();
+            _fileStream.Dispose();
         }
     }
 }

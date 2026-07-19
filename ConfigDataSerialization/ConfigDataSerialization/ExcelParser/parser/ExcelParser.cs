@@ -1,24 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using ConfigDataSerialization.ExcelParser.parser;
+using System.Linq;
+using ConfigDataSerialization.ExcelParser.parser.parsers;
+using OfficeOpenXml;
 
-namespace ConfigDataSerialization.ExcelParser
+namespace ConfigDataSerialization.ExcelParser.parser
 {
     /// <summary>
     /// Excel → FlatBuffer 导出编排器。
-    /// 按前缀选择 parser → 生成 .fbs / .json → flatc 编译 → 输出 wrapper。
-    /// 对 SheetDataInfo 子类型做 switch 分发，编译器自动匹配泛型重载。
+    /// 只依赖 IExcelParser 接口和工厂方法，不持有任何具体 Parser 引用。
+    /// 新增 Excel 类型只需在工厂中注册，编排器无改动。
     /// </summary>
     public class ExcelParser
     {
         private ParseConfig _config;
-        private DefaultExcelParser _defaultParser;
-        private GlobalConfigParser _globalParser;
-        private EnumParser _enumParser;
-        private FbsCodeGenerator _fbsGen;
-        private JsonDataGenerator _jsonGen;
-        private WrapperCodeCreator _wrapperCreator;
         private FlatBufferCompiler _flatc;
 
         public static ExcelParser Create(ParseConfig config)
@@ -29,28 +25,34 @@ namespace ConfigDataSerialization.ExcelParser
             if (!Directory.Exists(config.ExcelPath))
                 throw new IOException($"Excel path does not exist: {config.ExcelPath}");
 
-            var parser = new ExcelParser();
-            parser.Init(config);
-            return parser;
+            ExcelPackage.License.SetNonCommercialPersonal("Personal");
+
+            EnsureDir(config.OutputPath);
+
+            return new ExcelParser
+            {
+                _config = config,
+                _flatc = new FlatBufferCompiler(config.FlatcPath),
+            };
         }
 
         private ExcelParser() { }
 
-        private void Init(ParseConfig config)
+        // ===== 工厂 =====
+
+        /// <summary>
+        /// 按 sheet 名前缀返回对应的 IExcelParser 实现。
+        /// 新增数据类型只需在此添加 case，不改编排器逻辑。
+        /// </summary>
+        private static IExcelParser CreateParser(ParseConfig config, string sheetName)
         {
-            this._config = config;
-            OfficeOpenXml.ExcelPackage.License.SetNonCommercialPersonal("Personal");
+            if (sheetName.StartsWith(config.EnumPrefix))
+                return new EnumParser(config);
 
-            _defaultParser = new DefaultExcelParser(config);
-            _globalParser = new GlobalConfigParser(config);
-            _enumParser = new EnumParser(config);
-            _fbsGen = new FbsCodeGenerator();
-            _jsonGen = new JsonDataGenerator();
-            _wrapperCreator = new WrapperCodeCreator(config.DataListTemplate, config.GlobalConfigTemplate);
-            _flatc = new FlatBufferCompiler(config.FlatcPath);
+            if (sheetName.StartsWith(config.GlobalPrefix))
+                return new GlobalConfigParser(config);
 
-            // 确保输出目录存在
-            EnsureDir(config.OutputPath);
+            return new DataListParser(config);
         }
 
         // ===== 对外入口 =====
@@ -72,7 +74,7 @@ namespace ConfigDataSerialization.ExcelParser
                         continue;
 
                     var sheetName = excelReader.GetSheetName();
-                    if (IsIgnored(sheetName, out _))
+                    if (IsIgnored(sheetName))
                         continue;
 
                     if (!parsedSheets.Add(sheetName))
@@ -81,15 +83,17 @@ namespace ConfigDataSerialization.ExcelParser
                         continue;
                     }
 
-                    // 按类型解析并生成 .fbs
-                    var info = AnalyseSheet(excelReader);
-                    if (info == null) continue;
+                    var parser = CreateParser(_config, sheetName);
+                    var info = parser.AnalyseSheet(excelReader);
 
-                    GenerateFbs(info, fbsDir, fbsFiles);
+                    parser.GenerateFbs(info, fbsDir);
+                    fbsFiles.Add(Path.Combine(fbsDir, info.SheetName + ".fbs"));
+
+                    parser.CreateWrapper(info,
+                        Path.Combine(_config.OutputPath, "CS", "wrapper"));
                 }
             }
 
-            // flatc: .fbs → C#
             _flatc.CompileFbsToCSharp(fbsFiles,
                 Path.Combine(_config.OutputPath, "CS", "flatbuffer"));
         }
@@ -112,7 +116,11 @@ namespace ConfigDataSerialization.ExcelParser
                         continue;
 
                     var sheetName = excelReader.GetSheetName();
-                    if (IsIgnored(sheetName, out var prefixTag))
+                    if (IsIgnored(sheetName))
+                        continue;
+
+                    // 枚举类型不需要导出二进制数据
+                    if (sheetName.StartsWith(_config.EnumPrefix))
                         continue;
 
                     if (!parsedSheets.Add(sheetName))
@@ -121,110 +129,32 @@ namespace ConfigDataSerialization.ExcelParser
                         continue;
                     }
 
-                    // 枚举类型不需要生成 json 数据
-                    if (prefixTag == _config.EnumPrefix)
-                        continue;
+                    var parser = CreateParser(_config, sheetName);
+                    var info = parser.AnalyseSheet(excelReader);
 
-                    // 解析并生成 .json
-                    var info = AnalyseSheet(excelReader);
-                    if (info == null) continue;
-
-                    SerializeJson(info, excelReader, jsonDir, jsonFiles);
+                    parser.SerializeJson(info, excelReader, jsonDir);
+                    jsonFiles.Add(Path.Combine(jsonDir, info.SheetName + ".json"));
                     fbsFiles.Add(Path.Combine(_config.OutputPath, "fbs", info.SheetName + ".fbs"));
                 }
             }
 
-            // flatc: .json + .fbs → .bin
             _flatc.CompileJsonToBinary(jsonFiles, fbsFiles,
                 Path.Combine(_config.OutputPath, "binary"));
-        }
-
-        // ===== 内部流程 =====
-
-        private SheetDataInfo AnalyseSheet(IExcelSheetReader reader)
-        {
-            var sheetName = reader.GetSheetName();
-
-            if (sheetName.StartsWith(_config.EnumPrefix))
-                return _enumParser.AnalyseSheet(reader);
-
-            if (sheetName.StartsWith(_config.GlobalPrefix))
-                return _globalParser.AnalyseSheet(reader);
-
-            return _defaultParser.AnalyseSheet(reader);
-        }
-
-        private void GenerateFbs(SheetDataInfo info, string outputDir, List<string> fbsFiles)
-        {
-            switch (info)
-            {
-                case DataListSheetInfo dl:
-                    _fbsGen.Generate(dl, outputDir);
-                    break;
-                case GlobalConfigSheetInfo gc:
-                    _fbsGen.Generate(gc, outputDir);
-                    break;
-                case EnumSheetInfo e:
-                    _fbsGen.Generate(e, outputDir);
-                    break;
-            }
-
-            var path = Path.Combine(outputDir, info.SheetName + ".fbs");
-            fbsFiles.Add(path);
-
-            // 生成 wrapper（枚举不需要）
-            var wrapperDir = Path.Combine(_config.OutputPath, "CS", "wrapper");
-            switch (info)
-            {
-                case DataListSheetInfo dl:
-                    _wrapperCreator.CreateWrapper(dl, wrapperDir);
-                    break;
-                case GlobalConfigSheetInfo gc:
-                    _wrapperCreator.CreateWrapper(gc, wrapperDir);
-                    break;
-            }
-        }
-
-        private void SerializeJson(SheetDataInfo info, IExcelSheetReader reader, string outputDir, List<string> jsonFiles)
-        {
-            switch (info)
-            {
-                case DataListSheetInfo dl:
-                    _jsonGen.Serialize(dl, reader, outputDir);
-                    break;
-                case GlobalConfigSheetInfo gc:
-                    _jsonGen.Serialize(gc, reader, outputDir);
-                    break;
-            }
-
-            jsonFiles.Add(Path.Combine(outputDir, info.SheetName + ".json"));
         }
 
         // ===== 工具 =====
 
         private string[] ListExcelFiles()
         {
-            return Directory.GetFiles(_config.ExcelPath, "*.xlsx", SearchOption.AllDirectories);
+            return Directory.GetFiles(_config.ExcelPath, "*.xlsx", SearchOption.AllDirectories)
+                .Where(f => !Path.GetFileName(f).StartsWith("~$"))
+                .ToArray();
         }
 
-        private bool IsIgnored(string sheetName, out string matchedPrefix)
+        private bool IsIgnored(string sheetName)
         {
-            matchedPrefix = null;
-
-            if (string.IsNullOrEmpty(sheetName))
-                return true;
-
-            foreach (var prefix in new[] { _config.InvalidPrefix, _config.EnumPrefix, _config.GlobalPrefix })
-            {
-                if (!string.IsNullOrEmpty(prefix) && sheetName.StartsWith(prefix))
-                {
-                    matchedPrefix = prefix;
-                    // 只有 InvalidPrefix 需要跳过；其他前缀需要处理（但这里做前缀标记）
-                    return prefix == _config.InvalidPrefix;
-                }
-            }
-
-            return false;
+            return !string.IsNullOrEmpty(_config.InvalidPrefix)
+                && sheetName.StartsWith(_config.InvalidPrefix);
         }
 
         private static void EnsureDir(string path)
