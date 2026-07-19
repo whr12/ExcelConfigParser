@@ -2,7 +2,7 @@
 
 namespace ConfigDataSerialization.ExcelParser
 {
-    internal class ExcelReader : IDisposable
+    public class ExcelReader : IExcelReader, IExcelSheetReader, IDisposable
     {
         private ExcelPackage package;
 
@@ -27,14 +27,14 @@ namespace ConfigDataSerialization.ExcelParser
             return package.File.Name;
         }
 
-        public int GetWorksheetsCount()
+        public int GetWorkSheetsCount()
         {
             return workSheet.Workbook.Worksheets.Count;
         }
 
         public bool TrySwitchSheet(int sheetIndex)
         {
-            if (package.Workbook.Worksheets.Count > sheetIndex)
+            if (sheetIndex >= 0 && package.Workbook.Worksheets.Count > sheetIndex)
             {
                 workSheet = package.Workbook.Worksheets[sheetIndex];
                 return true;
@@ -42,12 +42,29 @@ namespace ConfigDataSerialization.ExcelParser
             return false;
         }
 
+        public bool TrySwitchSheet(string sheetName)
+        {
+            if (package.Workbook.Worksheets[sheetName] == null)
+            {
+                return false;
+            }
+
+            workSheet = package.Workbook.Worksheets[sheetName];
+            return true;
+        }
+
         public string GetSheetName()
         {
             return workSheet.Name;
         }
 
-        public string ReadExcel(int row, int column)
+        public int GetSheetIndex()
+        {
+            return workSheet.Index;
+        }
+
+
+        public string ReadSheet(int row, int column)
         {
             return workSheet.Cells[row, column].Text;
         }

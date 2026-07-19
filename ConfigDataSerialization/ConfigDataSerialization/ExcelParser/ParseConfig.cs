@@ -1,23 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace ConfigDataSerialization.ExcelParser
 {
-    internal struct ParseConfig
+    public struct ParseConfig
     {
-        public string NameSpace;
-        public string ExcelPath;
-        public string OutputPath;
+        public string Namespace { get; set; }
+        public string ExcelPath { get; set; }
+        public string OutputPath { get; set; }
 
-        public string InvalidPrefix;
-        public string EnumPrefix;
-        public string GlobalPrefix;
+        /// <summary>flatc.exe 的文件路径（相对或绝对）</summary>
+        public string FlatcPath { get; set; }
 
-        public int DataNameRow;
-        public int DataTypeRow;
-        public int DataStartRow;
+        /// <summary>类型1 数据列表 wrapper 模板路径</summary>
+        public string DataListTemplate { get; set; }
+
+        /// <summary>类型2 全局配置 wrapper 模板路径</summary>
+        public string GlobalConfigTemplate { get; set; }
+
+        public string InvalidPrefix { get; set; }
+        public string EnumPrefix { get; set; }
+        public string GlobalPrefix { get; set; }
+
+        public int DataNameRow { get; set; }
+        public int DataTypeRow { get; set; }
+        public int DataStartRow { get; set; }
     }
 }

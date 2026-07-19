@@ -1,5 +1,4 @@
-﻿using ConfigDataSerialization.ExcelParser;
-using OfficeOpenXml;
+using ConfigDataSerialization.ExcelParser;
 using System.IO;
 using System.Text.Json;
 
@@ -7,27 +6,41 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        Console.WriteLine("Start Program");
+        Console.WriteLine("ExcelConfigParser — Excel → FlatBuffer 导出工具");
 
-        //string license = System.IO.File.ReadAllText("F:\\Develop\\ThirdCode\\ConfigDataSerialization\\Excel\\PolyForm-Noncommercial-1.0.0.txt");
-        //ExcelPackage.License.SetNonCommercialPersonal("Personal");
-
-        //ExcelReader reader = ExcelReader.CreateExcelReader("F:\\Develop\\ThirdCode\\ConfigDataSerialization\\Excel\\BattleUnit.xlsx");
-        //IExcelTypeParser typeParser = new DefaultExcelTypeParser();
-        //typeParser.ParseToCode(reader, "F:\\Develop\\ThirdCode\\ConfigDataSerialization\\Excel\\parse\\BattleUnit.fbs");
-
-        //reader.Dispose();
-
-        string jsonText = File.ReadAllText("F:\\Develop\\ThirdCode\\ConfigDataSerialization\\Excel\\json\\parse_config.json");
-        using System.Text.Json.JsonDocument json = System.Text.Json.JsonDocument.Parse(jsonText);
-
-        JsonElement jsonElement = json.RootElement;
-
-        foreach(var i in jsonElement.EnumerateObject())
+        // 配置文件路径：命令行参数 > 默认相对路径
+        string configPath;
+        if (args.Length > 0)
         {
-            Log.Debug($"{i.Name} : {i.Value} ----> {i.Value.ValueKind}");
+            configPath = args[0];
+        }
+        else
+        {
+            configPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                "../../../../Excel/json/parse_config.json");
         }
 
-        Console.WriteLine("EndProgram");
+        configPath = Path.GetFullPath(configPath);
+        Console.WriteLine($"[Config] {configPath}");
+
+        if (!File.Exists(configPath))
+        {
+            Console.WriteLine($"[Error] 配置文件不存在: {configPath}");
+            return;
+        }
+
+        string jsonText = File.ReadAllText(configPath);
+        ParseConfig config = JsonSerializer.Deserialize<ParseConfig>(jsonText);
+
+        var parser = ExcelParser.Create(config);
+
+        Console.WriteLine("[Step 1/2] 生成代码...");
+        parser.ParseCode();
+
+        Console.WriteLine("[Step 2/2] 导出数据...");
+        parser.ParseData();
+
+        Console.WriteLine("完成。");
     }
 }

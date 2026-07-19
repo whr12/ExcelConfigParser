@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ConfigDataSerialization.ExcelParser
 {
-    internal static class Log
+    public static class Log
     {
         public static void Debug(string text)
         {

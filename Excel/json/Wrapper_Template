@@ -1,0 +1,83 @@
+using System.Collections.Generic;
+using System.IO;
+using Google.FlatBuffers;
+
+namespace GameConfig
+{
+    public class Table#DATA_LIST_NAME# : ITableData
+    {
+        private static string bytesFileName = "#BINARY_FILE#";
+
+        private ByteBuffer byteBuffer;
+        private #DATA_LIST_NAME# dataList;
+
+        private Dictionary<#KEY_TYPE_NAME#, #DATA_NAME#> idToData;
+
+        public #CLASS_NAME#()
+        {
+            idToData = new Dictionary<#KEY_TYPE_NAME#, #DATA_NAME#>();
+        }
+
+        public int GetLength()
+        {
+            return dataList.DatasLength;
+        }
+
+        public #DATA_NAME# GetDataById(KEY_TYPE_NAME id)
+        {
+            if (idToData.TryGetValue(id, out #DATA_NAME# data))
+            {
+                return data;
+            }
+
+            for (int i = 0; i < dataList.DatasLength; ++i)
+            {
+                var unit = dataList.Datas(i);
+                if (unit != null && unit.Value.Id == id)
+                {
+                    idToData.Add(id, unit.Value);
+                    return unit.Value;
+                }
+            }
+
+            return default;
+        }
+
+        public #DATA_NAME# GetDataByIndex(int index)
+        {
+            if (index < 0 || index >= dataList.DatasLength)
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    $"{index} is out of range [0, {dataList.DatasLength})");
+            }
+
+            var unit = dataList.Datas(index);
+            if (unit != null)
+            {
+                #DATA_NAME# data = unit.Value;
+                CacheData(data.Id, data);
+                return data;
+            }
+
+            return default;
+        }
+
+        public void LoadDataFromFolder(string folderPath)
+        {
+            byte[] bytes = File.ReadAllBytes(folderPath + bytesFileName);
+            byteBuffer = new ByteBuffer(bytes);
+            dataList = #DATA_LIST_NAME#.GetRootAsBattleUnitList(byteBuffer);
+        }
+
+        public void Release()
+        {
+
+        }
+
+        private void CacheData(KEY_TYPE_NAME id, #DATA_NAME# data)
+        {
+            idToData.TryAdd(id, data);
+        }
+
+    }
+}
