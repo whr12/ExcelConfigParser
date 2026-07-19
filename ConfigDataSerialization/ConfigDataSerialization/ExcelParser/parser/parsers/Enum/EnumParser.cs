@@ -26,7 +26,7 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             {
                 ExcelFileName = reader.GetExcelName(),
                 SheetName = sheetName,
-                DefineName = baseName,
+                DefineName = ExcelParserHelper.ConvertSheetNameToDefineName(baseName),
                 BinaryFileName = string.Empty,
                 Namespace = _config.Namespace,
                 Values = new List<EnumValueDefinition>(),

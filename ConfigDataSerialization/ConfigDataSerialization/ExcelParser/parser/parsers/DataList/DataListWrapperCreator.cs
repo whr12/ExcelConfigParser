@@ -4,9 +4,6 @@ using System.Text;
 
 namespace ConfigDataSerialization.ExcelParser.parser.parsers
 {
-    /// <summary>
-    /// 类型1 wrapper 生成。使用 DataListTemplate 模板替换占位符。
-    /// </summary>
     public class DataListWrapperCreator
     {
         private readonly string _templatePath;
@@ -14,6 +11,29 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
         public DataListWrapperCreator(string templatePath)
         {
             _templatePath = templatePath;
+        }
+
+        public void Create(DataListSheetInfo info, string outputPath)
+        {
+            if (string.IsNullOrEmpty(_templatePath) || !File.Exists(_templatePath))
+            {
+                Log.Warn($"Template missing: {_templatePath}");
+                return;
+            }
+
+            if (!Directory.Exists(outputPath))
+                Directory.CreateDirectory(outputPath);
+
+            var template = File.ReadAllText(_templatePath);
+            var content = template
+                .Replace("#NAMESPACE#", info.Namespace)
+                .Replace("#DEFINE_NAME#", info.DefineName)
+                .Replace("#BINARY_FILE#", info.BinaryFileName)
+                .Replace("#FIELD_COMMENTS#", GenerateFieldComments(info.Fields))
+                .Replace("#ROW_CLASS#", GenerateRowClass(info.DefineName, info.Fields));
+
+            var filePath = Path.Combine(outputPath, $"{info.DefineName}Data.cs");
+            File.WriteAllText(filePath, content, ExcelParserHelper.UTF8);
         }
 
         private static string GenerateFieldComments(List<SingleDataDefine> fields)
@@ -28,26 +48,54 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             return string.IsNullOrEmpty(result) ? string.Empty : result.TrimEnd();
         }
 
-        public void Create(DataListSheetInfo info, string outputPath)
+        private static string GenerateRowClass(string defineName, List<SingleDataDefine> fields)
         {
-            if (string.IsNullOrEmpty(_templatePath) || !File.Exists(_templatePath))
+            var sb = new StringBuilder();
+            sb.AppendLine($"    public class {defineName}Row");
+            sb.AppendLine("    {");
+
+            // Properties
+            foreach (var f in fields)
             {
-                Log.Warn($"模板文件不存在: {_templatePath}");
-                return;
+                var csType = MapToCSharpType(f.typeName);
+                var pascalName = ExcelParserHelper.ToPascalCase(f.dataName);
+                if (!string.IsNullOrEmpty(f.Comment))
+                    sb.AppendLine($"        /// <summary> {f.Comment} </summary>");
+                sb.AppendLine($"        public {csType} {pascalName} {{ get; private set; }}");
             }
 
-            if (!Directory.Exists(outputPath))
-                Directory.CreateDirectory(outputPath);
+            sb.AppendLine();
+            sb.AppendLine($"        internal {defineName}Row({defineName} src)");
+            sb.AppendLine("        {");
+            foreach (var f in fields)
+            {
+                var pascalName = ExcelParserHelper.ToPascalCase(f.dataName);
+                if (f.typeName.StartsWith("["))
+                    sb.AppendLine($"            {pascalName} = src.Get{pascalName}Array();");
+                else
+                    sb.AppendLine($"            {pascalName} = src.{pascalName};");
+            }
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
 
-            var template = File.ReadAllText(_templatePath);
-            var content = template
-                .Replace("#NAMESPACE#", info.Namespace)
-                .Replace("#DEFINE_NAME#", info.DefineName)
-                .Replace("#BINARY_FILE#", info.BinaryFileName)
-                .Replace("#FIELD_COMMENTS#", GenerateFieldComments(info.Fields));
+            return sb.ToString();
+        }
 
-            var filePath = Path.Combine(outputPath, $"{info.DefineName}Data.cs");
-            File.WriteAllText(filePath, content, Encoding.UTF8);
+        private static string MapToCSharpType(string fbType)
+        {
+            if (ExcelParserHelper.IsCustomType(fbType))
+                return ExcelParserHelper.ToPascalCase(fbType);
+
+            return fbType switch
+            {
+                "int" => "int",
+                "uint" => "uint",
+                "float" => "float",
+                "bool" => "bool",
+                "string" => "string",
+                _ when fbType.StartsWith("[") => fbType[1..^1] + "[]",
+                _ => fbType,
+            };
         }
     }
 }

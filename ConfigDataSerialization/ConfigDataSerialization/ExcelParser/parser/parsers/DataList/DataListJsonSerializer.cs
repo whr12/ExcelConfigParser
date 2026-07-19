@@ -11,7 +11,7 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
         {
             var filePath = Path.Combine(outputPath, info.SheetName + ".json");
 
-            using var writer = new StreamWriter(filePath);
+            using var writer = new StreamWriter(filePath, false, ExcelParserHelper.UTF8);
 
             writer.WriteLine($"// {info.ExcelFileName}  →  {info.SheetName}");
             writer.WriteLine("{");

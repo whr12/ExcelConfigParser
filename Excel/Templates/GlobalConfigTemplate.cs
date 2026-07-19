@@ -1,7 +1,7 @@
 using AIProject.Core;
 using Google.FlatBuffers;
 
-namespace GameConfig
+namespace #NAMESPACE#
 {
     public class #DEFINE_NAME#Data : ITableData
     {

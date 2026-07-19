@@ -11,7 +11,7 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
         {
             var filePath = Path.Combine(outputPath, info.SheetName + ".fbs");
 
-            using var writer = new StreamWriter(filePath);
+            using var writer = new StreamWriter(filePath, false, ExcelParserHelper.UTF8);
 
             writer.WriteLine($"// {info.ExcelFileName}  →  {info.SheetName}");
 
@@ -28,7 +28,9 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             {
                 if (!string.IsNullOrEmpty(f.Comment))
                     writer.WriteLine($"  /// {f.Comment}");
-                writer.WriteLine($"  {f.dataName} : {f.typeName};");
+                var typeName = ExcelParserHelper.IsCustomType(f.typeName)
+                    ? ExcelParserHelper.ToPascalCase(f.typeName) : f.typeName;
+                writer.WriteLine($"  {f.dataName} : {typeName};");
             }
             writer.WriteLine("}");
 

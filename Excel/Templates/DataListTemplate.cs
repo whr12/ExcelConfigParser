@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using AIProject.Core;
 using Google.FlatBuffers;
 
-namespace GameConfig
+namespace #NAMESPACE#
 {
 #FIELD_COMMENTS#
     public class #DEFINE_NAME#Data : ITableData
@@ -11,26 +11,25 @@ namespace GameConfig
 
         private ByteBuffer _byteBuffer;
         private #DEFINE_NAME#List _list;
-        private readonly Dictionary<uint, #DEFINE_NAME#> _idToData;
+        private readonly Dictionary<uint, #DEFINE_NAME#Row> _idToData = new();
+
+        private bool _loaded;
 
         public string FileName => FILE_NAME;
 
-        public #DEFINE_NAME#Data()
-        {
-            _idToData = new Dictionary<uint, #DEFINE_NAME#>();
-        }
-
-        public #DEFINE_NAME# GetById(uint id)
+        public #DEFINE_NAME#Row GetById(uint id)
         {
             _idToData.TryGetValue(id, out var data);
             return data;
         }
 
-        public #DEFINE_NAME#? GetByIndex(int index)
+        public #DEFINE_NAME#Row? GetByIndex(int index)
         {
             if (index < 0 || index >= _list.DatasLength)
                 return null;
-            return _list.Datas(index);
+            var item = _list.Datas(index);
+            if (item == null) return null;
+            return new #DEFINE_NAME#Row(item.Value);
         }
 
         public int GetCount()
@@ -48,7 +47,7 @@ namespace GameConfig
             {
                 var item = _list.Datas(i);
                 if (item != null)
-                    _idToData[item.Value.Id] = item.Value;
+                    _idToData[item.Value.Id] = new #DEFINE_NAME#Row(item.Value);
             }
         }
 
@@ -59,4 +58,6 @@ namespace GameConfig
             _idToData.Clear();
         }
     }
+
+#ROW_CLASS#
 }

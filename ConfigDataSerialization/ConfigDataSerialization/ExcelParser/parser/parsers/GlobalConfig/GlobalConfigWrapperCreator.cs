@@ -1,11 +1,9 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
 namespace ConfigDataSerialization.ExcelParser.parser.parsers
 {
-    /// <summary>
-    /// 类型2 wrapper 生成。使用 GlobalConfigTemplate，动态生成 #PROPERTIES#。
-    /// </summary>
     public class GlobalConfigWrapperCreator
     {
         private readonly string _templatePath;
@@ -19,7 +17,7 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
         {
             if (string.IsNullOrEmpty(_templatePath) || !File.Exists(_templatePath))
             {
-                Log.Warn($"模板文件不存在: {_templatePath}");
+                Log.Warn($"Template missing: {_templatePath}");
                 return;
             }
 
@@ -34,24 +32,29 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
                 .Replace("#PROPERTIES#", GenerateProperties(info.Fields));
 
             var filePath = Path.Combine(outputPath, $"{info.DefineName}Data.cs");
-            File.WriteAllText(filePath, content, Encoding.UTF8);
+            File.WriteAllText(filePath, content, ExcelParserHelper.UTF8);
         }
 
-        private static string GenerateProperties(System.Collections.Generic.List<SingleDataDefine> fields)
+        private static string GenerateProperties(List<SingleDataDefine> fields)
         {
             var sb = new StringBuilder();
             foreach (var f in fields)
             {
                 var csType = MapToCSharpType(f.typeName);
+                var pascalName = ExcelParserHelper.ToPascalCase(f.dataName);
+                var accessor = f.typeName.StartsWith("[") ? $"Get{pascalName}Array()" : pascalName;
                 if (!string.IsNullOrEmpty(f.Comment))
                     sb.AppendLine($"        /// <summary> {f.Comment} </summary>");
-                sb.AppendLine($"        public {csType} {f.dataName} => _data.{f.dataName};");
+                sb.AppendLine($"        public {csType} {pascalName} => _data.{accessor};");
             }
             return sb.ToString();
         }
 
         private static string MapToCSharpType(string fbType)
         {
+            if (ExcelParserHelper.IsCustomType(fbType))
+                return ExcelParserHelper.ToPascalCase(fbType);
+
             return fbType switch
             {
                 "int" => "int",
