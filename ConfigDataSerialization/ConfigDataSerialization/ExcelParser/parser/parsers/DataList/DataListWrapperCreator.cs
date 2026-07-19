@@ -24,16 +24,26 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             if (!Directory.Exists(outputPath))
                 Directory.CreateDirectory(outputPath);
 
+            var genName = info.DefineName + "_gen";
+
+            // Data 类（模板）
             var template = File.ReadAllText(_templatePath);
-            var content = template
+            var dataContent = template
                 .Replace("#NAMESPACE#", info.Namespace)
                 .Replace("#DEFINE_NAME#", info.DefineName)
+                .Replace("#GEN_NAME#", genName)
                 .Replace("#BINARY_FILE#", info.BinaryFileName)
-                .Replace("#FIELD_COMMENTS#", GenerateFieldComments(info.Fields))
-                .Replace("#ROW_CLASS#", GenerateRowClass(info.DefineName, info.Fields));
+                .Replace("#FIELD_COMMENTS#", GenerateFieldComments(info.Fields));
 
-            var filePath = Path.Combine(outputPath, $"{info.DefineName}Data.cs");
-            File.WriteAllText(filePath, content, ExcelParserHelper.UTF8);
+            File.WriteAllText(
+                Path.Combine(outputPath, $"{info.DefineName}Data.cs"),
+                dataContent, ExcelParserHelper.UTF8);
+
+            // Wrapper 类（纯代码生成）
+            var wrapperContent = GenerateWrapperClass(info.DefineName, genName, info.Fields, info.Namespace);
+            File.WriteAllText(
+                Path.Combine(outputPath, $"{info.DefineName}.cs"),
+                wrapperContent, ExcelParserHelper.UTF8);
         }
 
         private static string GenerateFieldComments(List<SingleDataDefine> fields)
@@ -44,39 +54,34 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
                 if (!string.IsNullOrEmpty(f.Comment))
                     sb.AppendLine($"    /// {f.dataName} — {f.Comment}");
             }
-            var result = sb.ToString();
-            return string.IsNullOrEmpty(result) ? string.Empty : result.TrimEnd();
+            return sb.Length == 0 ? string.Empty : sb.ToString().TrimEnd();
         }
 
-        private static string GenerateRowClass(string defineName, List<SingleDataDefine> fields)
+        private static string GenerateWrapperClass(string defineName, string genName,
+            List<SingleDataDefine> fields, string ns)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"    public class {defineName}Row");
+            sb.AppendLine($"namespace {ns}");
+            sb.AppendLine("{");
+            sb.AppendLine($"    public class {defineName}");
             sb.AppendLine("    {");
+            sb.AppendLine($"        private {genName} _raw;");
+            sb.AppendLine();
+            sb.AppendLine($"        public {defineName}({genName} raw) {{ _raw = raw; }}");
+            sb.AppendLine();
 
-            // Properties
             foreach (var f in fields)
             {
-                var csType = MapToCSharpType(f.typeName);
                 var pascalName = ExcelParserHelper.ToPascalCase(f.dataName);
+                var csType = MapToCSharpType(f.typeName);
+                var accessor = f.typeName.StartsWith("[") ? $"Get{pascalName}Array()" : pascalName;
                 if (!string.IsNullOrEmpty(f.Comment))
                     sb.AppendLine($"        /// <summary> {f.Comment} </summary>");
-                sb.AppendLine($"        public {csType} {pascalName} {{ get; private set; }}");
+                sb.AppendLine($"        public {csType} {pascalName} => _raw.{accessor};");
             }
 
-            sb.AppendLine();
-            sb.AppendLine($"        internal {defineName}Row({defineName} src)");
-            sb.AppendLine("        {");
-            foreach (var f in fields)
-            {
-                var pascalName = ExcelParserHelper.ToPascalCase(f.dataName);
-                if (f.typeName.StartsWith("["))
-                    sb.AppendLine($"            {pascalName} = src.Get{pascalName}Array();");
-                else
-                    sb.AppendLine($"            {pascalName} = src.{pascalName};");
-            }
-            sb.AppendLine("        }");
             sb.AppendLine("    }");
+            sb.AppendLine("}");
 
             return sb.ToString();
         }

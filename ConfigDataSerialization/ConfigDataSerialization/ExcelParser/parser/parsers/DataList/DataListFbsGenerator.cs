@@ -4,12 +4,14 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
 {
     /// <summary>
     /// 类型1 fbs 生成：table + tableList + root_type。
+    /// flatbuffer 内部类型加 _gen 后缀，业务层不可见。
     /// </summary>
     public class DataListFbsGenerator
     {
         public void Generate(DataListSheetInfo info, string outputPath)
         {
             var filePath = Path.Combine(outputPath, info.SheetName + ".fbs");
+            var genName = info.DefineName + "_gen";
 
             using var writer = new StreamWriter(filePath, false, ExcelParserHelper.UTF8);
 
@@ -22,7 +24,7 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             writer.WriteLine($"namespace {info.Namespace};");
             writer.WriteLine();
 
-            writer.WriteLine($"table {info.DefineName}");
+            writer.WriteLine($"table {genName}");
             writer.WriteLine("{");
             foreach (var f in info.Fields)
             {
@@ -35,13 +37,13 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             writer.WriteLine("}");
 
             writer.WriteLine();
-            writer.WriteLine($"table {info.DefineName}List");
+            writer.WriteLine($"table {genName}List");
             writer.WriteLine("{");
-            writer.WriteLine($"  datas : [{info.DefineName}];");
+            writer.WriteLine($"  datas : [{genName}];");
             writer.WriteLine("}");
 
             writer.WriteLine();
-            writer.WriteLine($"root_type {info.DefineName}List;");
+            writer.WriteLine($"root_type {genName}List;");
             writer.Flush();
         }
     }

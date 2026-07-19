@@ -24,10 +24,13 @@ namespace ConfigDataSerialization.ExcelParser.parser.parsers
             if (!Directory.Exists(outputPath))
                 Directory.CreateDirectory(outputPath);
 
+            var genName = info.DefineName + "_gen";
+
             var template = File.ReadAllText(_templatePath);
             var content = template
                 .Replace("#NAMESPACE#", info.Namespace)
                 .Replace("#DEFINE_NAME#", info.DefineName)
+                .Replace("#GEN_NAME#", genName)
                 .Replace("#BINARY_FILE#", info.BinaryFileName)
                 .Replace("#PROPERTIES#", GenerateProperties(info.Fields));
 
