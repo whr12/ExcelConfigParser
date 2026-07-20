@@ -59,7 +59,7 @@ namespace ConfigDataSerialization.ExcelParser.parser
 
         public void ParseCode()
         {
-            var parsedSheets = new HashSet<string>();
+            var parsedSheets = new Dictionary<string, string>();
             var fbsFiles = new List<string>();
 
             var fbsDir = Path.Combine(_config.OutputPath, "fbs");
@@ -77,11 +77,13 @@ namespace ConfigDataSerialization.ExcelParser.parser
                     if (IsIgnored(sheetName))
                         continue;
 
-                    if (!parsedSheets.Add(sheetName))
+                    if (parsedSheets.TryGetValue(sheetName, out var firstFile))
                     {
-                        Log.Error($"重复 sheet: {excelReader.GetExcelName()} → {sheetName}");
-                        continue;
+                        var msg = $"[{firstFile}] 和 [{excelReader.GetExcelName()}] 存在同名 sheet: {sheetName}";
+                        Log.Error(msg);
+                        throw new System.Exception(msg);
                     }
+                    parsedSheets[sheetName] = excelReader.GetExcelName();
 
                     var parser = CreateParser(_config, sheetName);
                     var info = parser.AnalyseSheet(excelReader);
@@ -100,7 +102,7 @@ namespace ConfigDataSerialization.ExcelParser.parser
 
         public void ParseData()
         {
-            var parsedSheets = new HashSet<string>();
+            var parsedSheets = new Dictionary<string, string>();
             var jsonFiles = new List<string>();
             var fbsFiles = new List<string>();
 
@@ -123,11 +125,13 @@ namespace ConfigDataSerialization.ExcelParser.parser
                     if (sheetName.StartsWith(_config.EnumPrefix))
                         continue;
 
-                    if (!parsedSheets.Add(sheetName))
+                    if (parsedSheets.TryGetValue(sheetName, out var firstFile))
                     {
-                        Log.Error($"重复 sheet: {excelReader.GetExcelName()} → {sheetName}");
-                        continue;
+                        var msg = $"[{firstFile}] 和 [{excelReader.GetExcelName()}] 存在同名 sheet: {sheetName}";
+                        Log.Error(msg);
+                        throw new System.Exception(msg);
                     }
+                    parsedSheets[sheetName] = excelReader.GetExcelName();
 
                     var parser = CreateParser(_config, sheetName);
                     var info = parser.AnalyseSheet(excelReader);
